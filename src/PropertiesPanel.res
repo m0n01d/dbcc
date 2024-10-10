@@ -57,12 +57,15 @@ module ViewExamples = {
 type theUnit = string // "%" "px"
 
 type status = Changed(theUnit) | Default | Focused(theUnit)
+
 type properties = {bottom: status, left: status, right: status, top: status}
 
 type margin = Margin(properties)
 type padding = Padding(properties)
 
-type marginAndPadding = {margin: margin, padding: padding}
+type model = {margin: margin, padding: padding}
+
+type field = Top | Bottom | Left | Right
 
 let statusToString = s =>
   switch s {
@@ -71,48 +74,110 @@ let statusToString = s =>
   | Focused(str) => str ++ "focused"
   }
 
-let viewPropertyStatus = theStatus => {
-  let s = statusToString(theStatus)
-  switch theStatus {
-  | Changed(str) =>
-    <p className={"underline decoration-dotted decoration-yellow-300"}> {s->React.string} </p>
-  | Default => <p> {s->React.string} </p>
-  | Focused(str) => <input value={str} />
-  }
-}
-
-let viewPadding = padding => <div> {"padding"->React.string} </div>
-let viewMarginAndPadding = (Margin(margin): margin, Padding(padding): padding) =>
-  <div className={"viewMargin"}>
-    <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.top)} </div>
-    <div className={"flex"}>
-      <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.left)} </div>
-      <div className={"flex-1 flex justify-center"}> {viewPadding(padding)} </div>
-      <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.right)} </div>
-    </div>
-    <div className={"flex justify-center"}> {viewPropertyStatus(margin.bottom)} </div>
-  </div>
+type msg<'a> = NoOp | UpdatedPadding(padding)
 @genType @genType.as("PropertiesPanel") @react.component
 let make = () => {
+  let initialState = {
+    margin: Margin({
+      bottom: Focused("100pt"),
+      left: Changed("1px"),
+      right: Changed("24px"),
+      top: Default,
+    }),
+    padding: Padding({
+      bottom: Default,
+      left: Default,
+      right: Changed("24px"),
+      top: Default,
+    }),
+  }
+  let update = (state, action) => {
+    switch action {
+    | NoOp => initialState
+    | UpdatedPadding(padding) => {...state, padding: padding}
+    }
+  }
+  let (state, dispatch) = React.useReducer(update, initialState)
+
+  let viewPadding = padding => {
+    let viewPropertyStatus = theField => {
+      let theStatus = switch theField {
+      | Top => padding.top
+      | Bottom => padding.bottom
+      | Left => padding.left
+      | Right => padding.right
+      }
+
+      <div className={"text-sm"}>
+        {switch theStatus {
+        | Changed(str) =>
+          <p className={"underline decoration-dotted decoration-yellow-300"}>
+            {str->React.string}
+          </p>
+        | Default => {
+            let focusProperty = _ => {
+              let focused = Focused("1px")
+              let p = switch theField {
+              | Top => {...padding, top: focused}
+              | Bottom => {...padding, bottom: focused}
+              | Left => {...padding, left: focused}
+              | Right => {...padding, right: focused}
+              }
+              let newPadding = Padding(p)
+
+              dispatch(UpdatedPadding(newPadding))
+            }
+            <button className={"unset"} onClick={focusProperty}> {"auto"->React.string} </button>
+          }
+        | Focused(str) => {
+            let handleInput = e => {
+              let focused = Focused(ReactEvent.Form.currentTarget(e)["value"])
+              let p = switch theField {
+              | Top => {...padding, top: focused}
+              | Bottom => {...padding, bottom: focused}
+              | Left => {...padding, left: focused}
+              | Right => {...padding, right: focused}
+              }
+              let newPadding = Padding(p)
+
+              dispatch(UpdatedPadding(newPadding))
+            }
+            <input value={str} onChange={handleInput} />
+          }
+        }}
+      </div>
+    }
+    <div className={"viewPadding w-full"}>
+      <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(Top)} </div>
+      <div className={"flex"}>
+        <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(Left)} </div>
+        <div className={"flex-2 flex justify-center"} />
+        <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(Right)} </div>
+      </div>
+      <div className={"flex justify-center"}> {viewPropertyStatus(Bottom)} </div>
+    </div>
+  }
+  let viewMarginAndPadding = (Margin(margin): margin, Padding(padding): padding) => {
+    let viewPropertyStatus = _ => <> </>
+    <div className={"viewMargin"}>
+      <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.top)} </div>
+      <div className={"flex"}>
+        <div className={"w-1/6 flex items-center justify-center"}>
+          {viewPropertyStatus(margin.left)}
+        </div>
+        <div className={"flex-2 flex items-center justify-center"}> {viewPadding(padding)} </div>
+        <div className={"w-1/6 flex items-center justify-center"}>
+          {viewPropertyStatus(margin.right)}
+        </div>
+      </div>
+      <div className={"flex justify-center"}> {viewPropertyStatus(margin.bottom)} </div>
+    </div>
+  }
+
   <aside className="PropertiesPanel">
     <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
-      <div className={"box"}>
-        {viewMarginAndPadding(
-          Margin({
-            bottom: Focused("100pt"),
-            left: Changed("1px"),
-            right: Changed("24px"),
-            top: Default,
-          }),
-          Padding({
-            bottom: Default,
-            left: Default,
-            right: Changed("24px"),
-            top: Default,
-          }),
-        )}
-      </div>
+      <div className={"box"}> {viewMarginAndPadding(state.margin, state.padding)} </div>
     </Collapsible>
     <Collapsible title="Size"> <span> {React.string("example")} </span> </Collapsible>
   </aside>
