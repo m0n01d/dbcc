@@ -7,12 +7,6 @@
 .box {
   border-radius: 0.25rem;
   background-color: #28334d;
-  min-height: 20px;
-
-
-
-  outline: 1px solid red;
-
 }
 
 
@@ -27,6 +21,19 @@
 
 .justify-center {
   justify-content: center;
+}
+.items-center {align-items: center;}
+.underline {
+  text-decoration: underline;
+}
+
+.decoration-dotted {
+  text-decoration-style: dotted;
+}
+
+
+.decoration-yellow-300 {
+  text-decoration-color: #fde047;
 }
 
 .Collapsible {

@@ -66,7 +66,7 @@ type marginAndPadding = {margin: margin, padding: padding}
 
 let statusToString = s =>
   switch s {
-  | Changed(str) => str ++ "changed"
+  | Changed(str) => str
   | Default => "auto"
   | Focused(str) => str ++ "focused"
   }
@@ -74,21 +74,23 @@ let statusToString = s =>
 let viewPropertyStatus = theStatus => {
   let s = statusToString(theStatus)
   switch theStatus {
-  | Changed(str) => <p> {s->React.string} </p>
+  | Changed(str) =>
+    <p className={"underline decoration-dotted decoration-yellow-300"}> {s->React.string} </p>
   | Default => <p> {s->React.string} </p>
-  | Focused(str) => <p> {"input go here"->React.string} </p>
+  | Focused(str) => <input value={str} />
   }
 }
+
 let viewPadding = padding => <div> {"padding"->React.string} </div>
 let viewMarginAndPadding = (Margin(margin): margin, Padding(padding): padding) =>
   <div className={"viewMargin"}>
     <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.top)} </div>
     <div className={"flex"}>
-      <div className={"flex-1"}> {viewPropertyStatus(margin.left)} </div>
-      <div className={"flex-1"}> {viewPadding(padding)} </div>
-      <div className={"flex-1"}> {viewPropertyStatus(margin.right)} </div>
+      <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.left)} </div>
+      <div className={"flex-1 flex justify-center"}> {viewPadding(padding)} </div>
+      <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.right)} </div>
     </div>
-    <div> {viewPropertyStatus(margin.bottom)} </div>
+    <div className={"flex justify-center"}> {viewPropertyStatus(margin.bottom)} </div>
   </div>
 @genType @genType.as("PropertiesPanel") @react.component
 let make = () => {
