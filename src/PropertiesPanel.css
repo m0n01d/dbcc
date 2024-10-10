@@ -3,7 +3,20 @@
   background-color: #3d4b6c;
   height: 100vh;
 }
+button.unset {
+  all: unset;
+  display: inline-block;
+  padding: 0.3rem 0;
+}
+button.changed {
+  text-decoration: underline;
+  text-decoration-style: dotted;
 
+  text-decoration-color: #fde047;
+}
+button.default {
+  color: rgba(255, 255, 255, 0.7);
+}
 .box {
   border-radius: 0.25rem;
   background-color: #28334d;
@@ -24,36 +37,23 @@
   flex: 2 1 0;
 }
 
-.flex  {
-  display : flex
+.flex {
+  display: flex;
 }
 
 .justify-center {
   justify-content: center;
 }
-.items-center {align-items: center;}
-.underline {
-  text-decoration: underline;
+.items-center {
+  align-items: center;
 }
 
-.decoration-dotted {
-  text-decoration-style: dotted;
+.w-full {
+  width: 100%;
 }
-
-
-.decoration-yellow-300 {
-  text-decoration-color: #fde047;
+.w-1\/6 {
+  width: 16.666667%;
 }
-
-.w-full {width: 100%;}
-.w-1\/6 {width: 16.666667%;}
-
-button.unset {
-  all:unset;
-  display: inline-block;
-  padding: 0.3rem 0;
-}
-
 
 .Collapsible {
   margin-bottom: 2px;

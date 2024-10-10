@@ -67,13 +67,6 @@ type model = {margin: spacing, padding: spacing}
 type field = Top | Bottom | Left | Right
 type msg = NoOp | UpdatedSpacing(spacing) | Saved
 
-let statusToString = s =>
-  switch s {
-  | Changed(str) => str
-  | Default => "auto"
-  | Focused(str) => str ++ "focused"
-  }
-
 let updateFieldSpacing = (outerSpacing, theField, newValue) => {
   switch (outerSpacing, theField) {
   | (Margin(margin), Top) => UpdatedSpacing(Margin({...margin, top: newValue}))
@@ -103,20 +96,18 @@ let viewPropertyStatus = (outerSpacing, theField, dispatch) => {
 
   let update = newValue => updateFieldSpacing(outerSpacing, theField, newValue)
 
-  <div className={"text-sm"}>
+  <span className={"text-sm "}>
     {switch theStatus {
     | Changed(str) =>
       <button
-        className={"underline decoration-dotted decoration-yellow-300 unset"}
-        type_={"button"}
-        onClick={_ => dispatch(update(Focused(str)))}>
+        className={"changed unset"} type_={"button"} onClick={_ => dispatch(update(Focused(str)))}>
         {str->React.string}
       </button>
     | Default => {
         let focusProperty = _ => {
           dispatch(update(Focused("1px")))
         }
-        <button className={"unset"} type_={"button"} onClick={focusProperty}>
+        <button className={"default unset"} type_={"button"} onClick={focusProperty}>
           {"auto"->React.string}
         </button>
       }
@@ -124,10 +115,10 @@ let viewPropertyStatus = (outerSpacing, theField, dispatch) => {
         let handleInput = e => {
           dispatch(update(Focused(ReactEvent.Form.currentTarget(e)["value"])))
         }
-        <input value={str} onChange={handleInput} />
+        <input value={str} onChange={handleInput} size={5} />
       }
     }}
-  </div>
+  </span>
 }
 
 @genType @genType.as("PropertiesPanel") @react.component
@@ -167,7 +158,7 @@ let make = () => {
         {viewPropertyStatus(outerSpacing, Top, dispatch)}
       </div>
       <div className={"flex"}>
-        <div className={"w-1/6 flex justify-center"}>
+        <div className={"w-1/6 flex justify-center items-center"}>
           {viewPropertyStatus(outerSpacing, Left, dispatch)}
         </div>
         <div className={"flex-2 flex justify-center"}>
@@ -176,7 +167,7 @@ let make = () => {
           | _ => React.null
           }}
         </div>
-        <div className={"w-1/6 flex justify-center"}>
+        <div className={"w-1/6 flex justify-center items-center"}>
           {viewPropertyStatus(outerSpacing, Right, dispatch)}
         </div>
       </div>
