@@ -4,6 +4,31 @@
   height: 100vh;
 }
 
+.box {
+  border-radius: 0.25rem;
+  background-color: #28334d;
+  min-height: 20px;
+
+
+
+  outline: 1px solid red;
+
+}
+
+
+
+.flex-1 {
+  flex: 1 1 0;
+}
+
+.flex  {
+  display : flex
+}
+
+.justify-center {
+  justify-content: center;
+}
+
 .Collapsible {
   margin-bottom: 2px;
 }

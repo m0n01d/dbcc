@@ -54,12 +54,64 @@ module ViewExamples = {
   }
 }
 
+type theUnit = string // "%" "px"
+
+type status = Changed(theUnit) | Default | Focused(theUnit)
+type properties = {bottom: status, left: status, right: status, top: status}
+
+type margin = Margin(properties)
+type padding = Padding(properties)
+
+type marginAndPadding = {margin: margin, padding: padding}
+
+let statusToString = s =>
+  switch s {
+  | Changed(str) => str ++ "changed"
+  | Default => "auto"
+  | Focused(str) => str ++ "focused"
+  }
+
+let viewPropertyStatus = theStatus => {
+  let s = statusToString(theStatus)
+  switch theStatus {
+  | Changed(str) => <p> {s->React.string} </p>
+  | Default => <p> {s->React.string} </p>
+  | Focused(str) => <p> {"input go here"->React.string} </p>
+  }
+}
+let viewPadding = padding => <div> {"padding"->React.string} </div>
+let viewMarginAndPadding = (Margin(margin): margin, Padding(padding): padding) =>
+  <div className={"viewMargin"}>
+    <div className={"flex-1 flex justify-center"}> {viewPropertyStatus(margin.top)} </div>
+    <div className={"flex"}>
+      <div className={"flex-1"}> {viewPropertyStatus(margin.left)} </div>
+      <div className={"flex-1"}> {viewPadding(padding)} </div>
+      <div className={"flex-1"}> {viewPropertyStatus(margin.right)} </div>
+    </div>
+    <div> {viewPropertyStatus(margin.bottom)} </div>
+  </div>
 @genType @genType.as("PropertiesPanel") @react.component
-let make = () =>
+let make = () => {
   <aside className="PropertiesPanel">
     <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
-      <span> {React.string("TODO: build me!")} </span>
+      <div className={"box"}>
+        {viewMarginAndPadding(
+          Margin({
+            bottom: Focused("100pt"),
+            left: Changed("1px"),
+            right: Changed("24px"),
+            top: Default,
+          }),
+          Padding({
+            bottom: Default,
+            left: Default,
+            right: Changed("24px"),
+            top: Default,
+          }),
+        )}
+      </div>
     </Collapsible>
     <Collapsible title="Size"> <span> {React.string("example")} </span> </Collapsible>
   </aside>
+}
