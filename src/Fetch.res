@@ -17,13 +17,19 @@ module Response = {
   external statusText: t => string = "statusText"
 }
 
-type options = {headers: Js.Dict.t<string>}
+module Request = {
+  type t
+  @get
+  external body: t => 'a = "body"
+}
+
+type options<'body> = {headers: Js.Dict.t<string>, method: string, body: option<'body>}
 
 @val
-external fetch: (string, options) => Js.Promise.t<Response.t> = "fetch"
+external fetch: (string, options<'body'>) => Js.Promise.t<Response.t> = "fetch"
 
 let fetchJson = (~headers=Js.Dict.empty(), url: string): Js.Promise.t<Js.Json.t> =>
-  fetch(url, {headers: headers}) |> Js.Promise.then_(res =>
+  fetch(url, {headers: headers, method: "GET", body: None}) |> Js.Promise.then_(res =>
     if !Response.ok(res) {
       res->Response.text->Js.Promise.then_(text => {
         let msg = `${res->Response.status->Js.Int.toString} ${res->Response.statusText}: ${text}`
@@ -33,3 +39,19 @@ let fetchJson = (~headers=Js.Dict.empty(), url: string): Js.Promise.t<Js.Json.t>
       res->Response.json
     }
   )
+
+let postJson = (
+  ~headers=Js.Dict.fromList(list{("Content-Type", "application/json")}),
+  url: string,
+  ~body: 'body,
+): Js.Promise.t<unit> =>
+  fetch(
+    url,
+    {headers: headers, method: "POST", body: Some(Js.Json.stringify(body))},
+  ) |> Js.Promise.then_(res => {
+    if Response.ok(res) {
+      Js.Promise.resolve()
+    } else {
+      Js.Exn.raiseError("woops")
+    }
+  })

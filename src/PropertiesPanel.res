@@ -1,5 +1,5 @@
 %raw(`require("./PropertiesPanel.css")`)
-
+let apiUrl = `http://localhost:12346/examples`
 module Collapsible = {
   @react.component
   let make = (~title, ~children) => {
@@ -30,7 +30,7 @@ module ViewExamples = {
 
     React.useEffect1(() => {
       // Fetch the data from /examples and set the state when the promise resolves
-      Fetch.fetchJson(`http://localhost:12346/examples`)
+      Fetch.fetchJson(apiUrl)
       |> Js.Promise.then_(examplesJson => {
         // NOTE: this uses an unsafe type cast, as safely parsing JSON in rescript is somewhat advanced.
         Js.Promise.resolve(setExamples(_ => Some(Obj.magic(examplesJson))))
@@ -62,27 +62,29 @@ type properties = {bottom: status, left: status, right: status, top: status}
 
 type spacing = Margin(properties) | Padding(properties)
 
-type model = {margin: spacing, padding: spacing}
+type spacingArea = {margin: spacing, padding: spacing}
+
+type model = {initialState: spacingArea, spacingArea: spacingArea}
 
 type field = Top | Bottom | Left | Right
-type msg = NoOp | UpdatedSpacing(spacing) | Saved
+type msg = GotSpacing(spacingArea) | NoOp | UpdatedSpacing(spacing) | Saved
 
 let updateFieldSpacing = (outerSpacing, theField, newValue) => {
   switch (outerSpacing, theField) {
-  | (Margin(margin), Top) => UpdatedSpacing(Margin({...margin, top: newValue}))
-  | (Margin(margin), Bottom) => UpdatedSpacing(Margin({...margin, bottom: newValue}))
-  | (Margin(margin), Left) => UpdatedSpacing(Margin({...margin, left: newValue}))
-  | (Margin(margin), Right) => UpdatedSpacing(Margin({...margin, right: newValue}))
+  | (Margin(margin), Top) => Margin({...margin, top: newValue})
+  | (Margin(margin), Bottom) => Margin({...margin, bottom: newValue})
+  | (Margin(margin), Left) => Margin({...margin, left: newValue})
+  | (Margin(margin), Right) => Margin({...margin, right: newValue})
 
-  | (Padding(padding), Top) => UpdatedSpacing(Padding({...padding, top: newValue}))
-  | (Padding(padding), Bottom) => UpdatedSpacing(Padding({...padding, bottom: newValue}))
-  | (Padding(padding), Left) => UpdatedSpacing(Padding({...padding, left: newValue}))
-  | (Padding(padding), Right) => UpdatedSpacing(Padding({...padding, right: newValue}))
+  | (Padding(padding), Top) => Padding({...padding, top: newValue})
+  | (Padding(padding), Bottom) => Padding({...padding, bottom: newValue})
+  | (Padding(padding), Left) => Padding({...padding, left: newValue})
+  | (Padding(padding), Right) => Padding({...padding, right: newValue})
   }
 }
 
-let viewPropertyStatus = (outerSpacing, theField, dispatch) => {
-  let theStatus = switch (outerSpacing, theField) {
+let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
+  let theStatus = switch (marginOrPadding, theField) {
   | (Margin(margin), Top) => margin.top
   | (Margin(margin), Bottom) => margin.bottom
   | (Margin(margin), Left) => margin.left
@@ -94,18 +96,22 @@ let viewPropertyStatus = (outerSpacing, theField, dispatch) => {
   | (Padding(padding), Right) => padding.right
   }
 
-  let update = newValue => updateFieldSpacing(outerSpacing, theField, newValue)
+  let updateSpacing = newValue => UpdatedSpacing(
+    updateFieldSpacing(marginOrPadding, theField, newValue),
+  )
 
   <span className={"text-sm "}>
     {switch theStatus {
     | Changed(str) =>
       <button
-        className={"changed unset"} type_={"button"} onClick={_ => dispatch(update(Focused(str)))}>
+        className={"changed unset"}
+        type_={"button"}
+        onClick={_ => dispatch(updateSpacing(Focused(str)))}>
         {str->React.string}
       </button>
     | Default => {
         let focusProperty = _ => {
-          dispatch(update(Focused("1px")))
+          dispatch(updateSpacing(Focused("1px")))
         }
         <button className={"default unset"} type_={"button"} onClick={focusProperty}>
           {"auto"->React.string}
@@ -113,7 +119,7 @@ let viewPropertyStatus = (outerSpacing, theField, dispatch) => {
       }
     | Focused(str) => {
         let handleInput = e => {
-          dispatch(update(Focused(ReactEvent.Form.currentTarget(e)["value"])))
+          dispatch(updateSpacing(Focused(ReactEvent.Form.currentTarget(e)["value"])))
         }
         <input value={str} onChange={handleInput} size={5} />
       }
@@ -124,42 +130,93 @@ let viewPropertyStatus = (outerSpacing, theField, dispatch) => {
 @genType @genType.as("PropertiesPanel") @react.component
 let make = () => {
   let initialState = {
-    margin: Margin({
-      bottom: Focused("100pt"),
-      left: Changed("1px"),
-      right: Changed("24px"),
-      top: Default,
-    }),
-    padding: Padding({
-      bottom: Default,
-      left: Default,
-      right: Changed("24px"),
-      top: Default,
-    }),
+    initialState: {
+      margin: Margin({
+        bottom: Focused("100pt"),
+        left: Changed("1px"),
+        right: Changed("24px"),
+        top: Default,
+      }),
+      padding: Padding({
+        bottom: Default,
+        left: Default,
+        right: Changed("24px"),
+        top: Default,
+      }),
+    },
+    spacingArea: {
+      margin: Margin({
+        bottom: Focused("100pt"),
+        left: Changed("1px"),
+        right: Changed("24px"),
+        top: Default,
+      }),
+      padding: Padding({
+        bottom: Default,
+        left: Default,
+        right: Changed("24px"),
+        top: Default,
+      }),
+    },
   }
+
+  let statusToString = status => {
+    switch status {
+    | Changed(str) => str
+    | Default => "auto"
+    | Focused(str) => str
+    }
+  }
+
+  let encodeSpacing = ({bottom, left, right, top}) =>
+    {
+      "bottom": statusToString(bottom),
+      "left": statusToString(left),
+      "right": statusToString(right),
+      "top": statusToString(top),
+    }
+
+  let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}) =>
+    {"margin": encodeSpacing(margin), "padding": encodeSpacing(padding)}
 
   let update = (state, action) => {
     switch action {
+    | GotSpacing(spacingArea) => {spacingArea: spacingArea, initialState: spacingArea}
     | NoOp => initialState
     | UpdatedSpacing(newSpacing) =>
       switch newSpacing {
-      | Margin(m) => {...state, margin: Margin(m)}
-      | Padding(p) => {...state, padding: Padding(p)}
+      | Margin(m) => {
+          let spacingArea = state.spacingArea
+          let newSpacing = {...spacingArea, margin: Margin(m)}
+          {...state, spacingArea: newSpacing}
+        }
+      | Padding(p) => {
+          let spacingArea = state.spacingArea
+          let newSpacing = {...spacingArea, padding: Padding(p)}
+          {...state, spacingArea: newSpacing}
+        }
       }
-    | Saved => initialState
+    | Saved => {
+        let body = state.spacingArea->encodeSpacing
+        let req = Fetch.postJson(apiUrl, ~body)
+
+        let _ = Js.Console.log(("saved", body))
+
+        initialState
+      }
     }
   }
 
   let (state, dispatch) = React.useReducer(update, initialState)
 
   let rec viewPrism = (outerSpacing: spacing, maybeInnerSpacing: option<spacing>) => {
-    <form className={"viewPadding w-full"} onSubmit={_ => dispatch(Saved)}>
+    <div className={"viewPadding w-full"}>
       <div className={"flex-1 flex justify-center"}>
-        {viewPropertyStatus(outerSpacing, Top, dispatch)}
+        {viewSpacingProperty(outerSpacing, Top, dispatch)}
       </div>
       <div className={"flex"}>
         <div className={"w-1/6 flex justify-center items-center"}>
-          {viewPropertyStatus(outerSpacing, Left, dispatch)}
+          {viewSpacingProperty(outerSpacing, Left, dispatch)}
         </div>
         <div className={"flex-2 flex justify-center"}>
           {switch maybeInnerSpacing {
@@ -168,19 +225,27 @@ let make = () => {
           }}
         </div>
         <div className={"w-1/6 flex justify-center items-center"}>
-          {viewPropertyStatus(outerSpacing, Right, dispatch)}
+          {viewSpacingProperty(outerSpacing, Right, dispatch)}
         </div>
       </div>
       <div className={"flex justify-center"}>
-        {viewPropertyStatus(outerSpacing, Bottom, dispatch)}
+        {viewSpacingProperty(outerSpacing, Bottom, dispatch)}
       </div>
-    </form>
+    </div>
   }
 
   <aside className="PropertiesPanel">
     <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
-      <div className={"box"}> {viewPrism(state.margin, Some(state.padding))} </div>
+      <form
+        className={"box"}
+        onSubmit={e => {
+          ReactEvent.Form.preventDefault(e)
+          dispatch(Saved)
+        }}>
+        {viewPrism(state.spacingArea.margin, Some(state.spacingArea.padding))}
+        <button> {"save"->React.string} </button>
+      </form>
     </Collapsible>
     <Collapsible title="Size"> <span> {React.string("example")} </span> </Collapsible>
   </aside>
