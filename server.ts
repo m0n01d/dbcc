@@ -15,7 +15,7 @@ const setupApp = (client: Client): express.Application => {
   app.use(express.json());
 
   app.get("/examples", async (_req, res) => {
-    const { rows } = await client.query(`SELECT * FROM example_table`);
+    const { rows } = await client.query(`SELECT * FROM example_table ORDER BY ID DESC LIMIT 1`);
     res.json(rows);
   });
   app.post("/examples", async (_req, res) => {

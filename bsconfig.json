@@ -1,7 +1,7 @@
 {
   "name": "@draftbit/coding-challenge-prism",
   "reason": { "react-jsx": 3 },
-  "bsc-flags": ["-bs-super-errors"],
+  "bsc-flags": ["-bs-super-errors", "-open JsonCombinators"],
   "sources": [
     {
       "dir": "src",
@@ -16,11 +16,11 @@
   ],
   "suffix": ".bs.js",
   "namespace": true,
-  "bs-dependencies": [ "@rescript/react" ],
-  "bs-dev-dependencies":[ ],
+  "bs-dependencies": ["@rescript/react", "@glennsl/rescript-json-combinators"],
+  "bs-dev-dependencies": [],
   "ppx-flags": [],
   "refmt": 3,
-"gentypeconfig": {
+  "gentypeconfig": {
     "language": "typescript",
     "shims": {},
     "generatedFileExtension": ".gen.tsx",
@@ -29,5 +29,5 @@
       "all": false,
       "basic": false
     }
-}
+  }
 }

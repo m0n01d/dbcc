@@ -45,9 +45,8 @@ module ViewExamples = {
       | None => React.string("Loading examples....")
       | Some(examples) =>
         examples
-        ->Js.Array2.map(example =>
-          React.string(`Int: ${example.some_int->Js.Int.toString}, Str: ${example.some_text}`)
-        )
+        ->Js.Array2.map(example => React.null)
+        // React.string(`Int: ${example.some_int->Js.Int.toString}, Str: ${example.some_text}`)
         ->React.array
       }}
     </div>
@@ -56,7 +55,7 @@ module ViewExamples = {
 
 type theUnit = string // "%" "px"
 
-type status = Changed(theUnit) | Default | Focused(theUnit)
+type status = Changed(theUnit) | Default(theUnit) | Focused(theUnit)
 
 type properties = {bottom: status, left: status, right: status, top: status}
 
@@ -64,10 +63,31 @@ type spacing = Margin(properties) | Padding(properties)
 
 type spacingArea = {margin: spacing, padding: spacing}
 
-type model = {initialState: spacingArea, spacingArea: spacingArea}
+type model = {initialState: spacingArea, shouldFetch: bool, spacingArea: spacingArea}
 
 type field = Top | Bottom | Left | Right
-type msg = GotSpacing(spacingArea) | NoOp | UpdatedSpacing(spacing) | Saved
+type msg = GotSpacing(spacingArea) | NoOp | UpdatedSpacing(spacing) | Saved | StartedFetching
+
+module Decode = {
+  open Json.Decode
+  let decodeStuff = Json.Decode.map(string, (. s) => Default(s))
+  let decodeProperties = object(field => {
+    bottom: field.required(. "bottom", decodeStuff),
+    left: field.required(. "left", decodeStuff),
+    right: field.required(. "right", decodeStuff),
+    top: field.required(. "top", decodeStuff),
+  })
+  let decodeSpacing = object(field => {
+    margin: field.required(.
+      "margin",
+      decodeProperties->Json.Decode.map((. margin) => Margin(margin)),
+    ),
+    padding: field.required(.
+      "padding",
+      decodeProperties->Json.Decode.map((. padding) => Padding(padding)),
+    ),
+  })
+}
 
 let updateFieldSpacing = (outerSpacing, theField, newValue) => {
   switch (outerSpacing, theField) {
@@ -84,16 +104,16 @@ let updateFieldSpacing = (outerSpacing, theField, newValue) => {
 }
 
 let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
-  let theStatus = switch (marginOrPadding, theField) {
-  | (Margin(margin), Top) => margin.top
-  | (Margin(margin), Bottom) => margin.bottom
-  | (Margin(margin), Left) => margin.left
-  | (Margin(margin), Right) => margin.right
-
-  | (Padding(padding), Top) => padding.top
-  | (Padding(padding), Bottom) => padding.bottom
-  | (Padding(padding), Left) => padding.left
-  | (Padding(padding), Right) => padding.right
+  let spacingStatus = spacing =>
+    switch theField {
+    | Top => spacing.top
+    | Bottom => spacing.bottom
+    | Left => spacing.left
+    | Right => spacing.right
+    }
+  let theStatus = switch marginOrPadding {
+  | Margin(margin) => spacingStatus(margin)
+  | Padding(padding) => spacingStatus(padding)
   }
 
   let updateSpacing = newValue => UpdatedSpacing(
@@ -109,19 +129,22 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
         onClick={_ => dispatch(updateSpacing(Focused(str)))}>
         {str->React.string}
       </button>
-    | Default => {
+    | Default(str) => {
         let focusProperty = _ => {
-          dispatch(updateSpacing(Focused("1px")))
+          dispatch(updateSpacing(Focused(str)))
         }
         <button className={"default unset"} type_={"button"} onClick={focusProperty}>
-          {"auto"->React.string}
+          {str->React.string}
         </button>
       }
     | Focused(str) => {
         let handleInput = e => {
           dispatch(updateSpacing(Focused(ReactEvent.Form.currentTarget(e)["value"])))
         }
-        <input value={str} onChange={handleInput} size={5} />
+        let handleBlur = e => {
+          dispatch(updateSpacing(Changed(str)))
+        }
+        <input value={str} onChange={handleInput} onBlur={handleBlur} size={5} />
       }
     }}
   </span>
@@ -135,40 +158,41 @@ let make = () => {
         bottom: Focused("100pt"),
         left: Changed("1px"),
         right: Changed("24px"),
-        top: Default,
+        top: Default("auto"),
       }),
       padding: Padding({
-        bottom: Default,
-        left: Default,
+        bottom: Default("auto"),
+        left: Default("auto"),
         right: Changed("24px"),
-        top: Default,
+        top: Default("auto"),
       }),
     },
+    shouldFetch: true,
     spacingArea: {
       margin: Margin({
         bottom: Focused("100pt"),
         left: Changed("1px"),
         right: Changed("24px"),
-        top: Default,
+        top: Default("auto"),
       }),
       padding: Padding({
-        bottom: Default,
-        left: Default,
+        bottom: Default("auto"),
+        left: Default("auto"),
         right: Changed("24px"),
-        top: Default,
+        top: Default("auto"),
       }),
     },
   }
 
-  let statusToString = status => {
+  let statusToString = (status: status): string => {
     switch status {
     | Changed(str) => str
-    | Default => "auto"
+    | Default(str) => str
     | Focused(str) => str
     }
   }
 
-  let encodeSpacing = ({bottom, left, right, top}) =>
+  let encodeSpacingProperties = ({bottom, left, right, top}: properties) =>
     {
       "bottom": statusToString(bottom),
       "left": statusToString(left),
@@ -176,12 +200,19 @@ let make = () => {
       "top": statusToString(top),
     }
 
-  let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}) =>
-    {"margin": encodeSpacing(margin), "padding": encodeSpacing(padding)}
+  let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacingArea) =>
+    {
+      "margin": encodeSpacingProperties(margin),
+      "padding": encodeSpacingProperties(padding),
+    }
 
   let update = (state, action) => {
     switch action {
-    | GotSpacing(spacingArea) => {spacingArea: spacingArea, initialState: spacingArea}
+    | GotSpacing(spacingArea) => {
+        ...state,
+        spacingArea: spacingArea,
+        initialState: spacingArea,
+      }
     | NoOp => initialState
     | UpdatedSpacing(newSpacing) =>
       switch newSpacing {
@@ -196,19 +227,34 @@ let make = () => {
           {...state, spacingArea: newSpacing}
         }
       }
-    | Saved => {
-        let body = state.spacingArea->encodeSpacing
-        let req = Fetch.postJson(apiUrl, ~body)
+    | Saved => // let _ = Js.Console.log(("saved", body))
 
-        let _ = Js.Console.log(("saved", body))
-
-        initialState
-      }
+      {...state, shouldFetch: true}
+    | StartedFetching => {...state, shouldFetch: false}
     }
   }
 
   let (state, dispatch) = React.useReducer(update, initialState)
-
+  React.useEffect1(() => {
+    // Fetch the data from /examples and set the state when the promise resolves
+    dispatch(StartedFetching)
+    if state.shouldFetch {
+      Fetch.fetchJson(apiUrl)
+      |> Js.Promise.then_(res => {
+        let result = res->Json.decode(Json.Decode.array(Decode.decodeSpacing))
+        switch result {
+        | Ok([spacingArea]) => dispatch(GotSpacing(spacingArea))
+        | Error(err) => Js.Console.log("@TODO error handling :)")
+        }
+        Js.Promise.resolve()
+        // let spacingArea = {margin: Margin(spacing.margin), padding: Padding(spacing.padding)}
+        // NOTE: this uses an unsafe type cast, as safely parsing JSON in rescript is somewhat advanced.
+      })
+      // The "ignore" function is necessary because each statement is expected to return `unit` type, but Js.Promise.then return a Promise type.
+      |> ignore
+    }
+    None
+  }, [state.shouldFetch])
   let rec viewPrism = (outerSpacing: spacing, maybeInnerSpacing: option<spacing>) => {
     <div className={"viewPadding w-full"}>
       <div className={"flex-1 flex justify-center"}>
@@ -234,6 +280,16 @@ let make = () => {
     </div>
   }
 
+  let saveSpacing = spacingArea => {
+    //dispatch(Saving...)
+    let body: 'a = encodeSpacing(spacingArea)
+    Fetch.postJson(apiUrl, ~body) |> Js.Promise.then_(res => {
+      dispatch(Saved)
+
+      Js.Promise.resolve(res)
+    })
+  }
+
   <aside className="PropertiesPanel">
     <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
@@ -241,10 +297,10 @@ let make = () => {
         className={"box"}
         onSubmit={e => {
           ReactEvent.Form.preventDefault(e)
-          dispatch(Saved)
+          saveSpacing(state.spacingArea)->ignore
         }}>
         {viewPrism(state.spacingArea.margin, Some(state.spacingArea.padding))}
-        <button> {"save"->React.string} </button>
+        <button type_={"submit"}> {"save"->React.string} </button>
       </form>
     </Collapsible>
     <Collapsible title="Size"> <span> {React.string("example")} </span> </Collapsible>

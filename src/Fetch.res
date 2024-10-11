@@ -47,8 +47,9 @@ let postJson = (
 ): Js.Promise.t<unit> =>
   fetch(
     url,
-    {headers: headers, method: "POST", body: Some(Js.Json.stringify(body))},
+    {headers: headers, method: "POST", body: Some(Js.Json.stringifyAny(body))},
   ) |> Js.Promise.then_(res => {
+    Js.Console.log("POSTED")
     if Response.ok(res) {
       Js.Promise.resolve()
     } else {
