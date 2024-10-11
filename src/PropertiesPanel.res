@@ -28,17 +28,17 @@ module ViewExamples = {
   let make = () => {
     let (examples: option<array<example>>, setExamples) = React.useState(_ => None)
 
-    React.useEffect1(() => {
-      // Fetch the data from /examples and set the state when the promise resolves
-      Fetch.fetchJson(apiUrl)
-      |> Js.Promise.then_(examplesJson => {
-        // NOTE: this uses an unsafe type cast, as safely parsing JSON in rescript is somewhat advanced.
-        Js.Promise.resolve(setExamples(_ => Some(Obj.magic(examplesJson))))
-      })
-      // The "ignore" function is necessary because each statement is expected to return `unit` type, but Js.Promise.then return a Promise type.
-      |> ignore
-      None
-    }, [setExamples])
+    // React.useEffect1(() => {
+    //   // Fetch the data from /examples and set the state when the promise resolves
+    //   Fetch.fetchJson(apiUrl)
+    //   |> Js.Promise.then_(examplesJson => {
+    //     // NOTE: this uses an unsafe type cast, as safely parsing JSON in rescript is somewhat advanced.
+    //     Js.Promise.resolve(setExamples(_ => Some(Obj.magic(examplesJson))))
+    //   })
+    //   // The "ignore" function is necessary because each statement is expected to return `unit` type, but Js.Promise.then return a Promise type.
+    //   |> ignore
+    //   None
+    // }, [setExamples])
 
     <div>
       {switch examples {
@@ -90,16 +90,16 @@ module Decode = {
 }
 
 let updateFieldSpacing = (outerSpacing, theField, newValue) => {
-  switch (outerSpacing, theField) {
-  | (Margin(margin), Top) => Margin({...margin, top: newValue})
-  | (Margin(margin), Bottom) => Margin({...margin, bottom: newValue})
-  | (Margin(margin), Left) => Margin({...margin, left: newValue})
-  | (Margin(margin), Right) => Margin({...margin, right: newValue})
-
-  | (Padding(padding), Top) => Padding({...padding, top: newValue})
-  | (Padding(padding), Bottom) => Padding({...padding, bottom: newValue})
-  | (Padding(padding), Left) => Padding({...padding, left: newValue})
-  | (Padding(padding), Right) => Padding({...padding, right: newValue})
+  let setNewField = spacing =>
+    switch theField {
+    | Bottom => {...spacing, bottom: newValue}
+    | Left => {...spacing, left: newValue}
+    | Right => {...spacing, right: newValue}
+    | Top => {...spacing, top: newValue}
+    }
+  switch outerSpacing {
+  | Margin(margin) => setNewField(margin)->Margin
+  | Padding(padding) => setNewField(padding)->Padding
   }
 }
 
@@ -144,7 +144,7 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
         let handleBlur = e => {
           dispatch(updateSpacing(Changed(str)))
         }
-        <input value={str} onChange={handleInput} onBlur={handleBlur} size={5} />
+        <input autoFocus={true} value={str} onChange={handleInput} onBlur={handleBlur} size={5} />
       }
     }}
   </span>
