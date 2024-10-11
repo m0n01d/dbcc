@@ -56,6 +56,13 @@ module ViewExamples = {
 type theUnit = string // "%" "px"
 
 type status = Changed(theUnit) | Default(theUnit) | Focused(theUnit)
+let statusToString = (status: status): string => {
+  switch status {
+  | Changed(str) => str
+  | Default(str) => str
+  | Focused(str) => str
+  }
+}
 
 type properties = {bottom: status, left: status, right: status, top: status}
 
@@ -66,7 +73,21 @@ type spacingArea = {margin: spacing, padding: spacing}
 type model = {initialState: spacingArea, shouldFetch: bool, spacingArea: spacingArea}
 
 type field = Top | Bottom | Left | Right
-type msg = GotSpacing(spacingArea) | NoOp | UpdatedSpacing(spacing) | Saved | StartedFetching
+type msg = GotSpacing(spacingArea) | UpdatedSpacing(spacing) | Saved | StartedFetching
+
+let encodeSpacingProperties = ({bottom, left, right, top}: properties) =>
+  {
+    "bottom": statusToString(bottom),
+    "left": statusToString(left),
+    "right": statusToString(right),
+    "top": statusToString(top),
+  }
+
+let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacingArea) =>
+  {
+    "margin": encodeSpacingProperties(margin),
+    "padding": encodeSpacingProperties(padding),
+  }
 
 module Decode = {
   open Json.Decode
@@ -155,56 +176,34 @@ let make = () => {
   let initialState = {
     initialState: {
       margin: Margin({
-        bottom: Focused("100pt"),
-        left: Changed("1px"),
-        right: Changed("24px"),
+        bottom: Default("auto"),
+        left: Default("auto"),
+        right: Default("auto"),
         top: Default("auto"),
       }),
       padding: Padding({
         bottom: Default("auto"),
         left: Default("auto"),
-        right: Changed("24px"),
+        right: Default("auto"),
         top: Default("auto"),
       }),
     },
     shouldFetch: true,
     spacingArea: {
       margin: Margin({
-        bottom: Focused("100pt"),
-        left: Changed("1px"),
-        right: Changed("24px"),
+        bottom: Default("auto"),
+        left: Default("auto"),
+        right: Default("auto"),
         top: Default("auto"),
       }),
       padding: Padding({
         bottom: Default("auto"),
         left: Default("auto"),
-        right: Changed("24px"),
+        right: Default("auto"),
         top: Default("auto"),
       }),
     },
   }
-
-  let statusToString = (status: status): string => {
-    switch status {
-    | Changed(str) => str
-    | Default(str) => str
-    | Focused(str) => str
-    }
-  }
-
-  let encodeSpacingProperties = ({bottom, left, right, top}: properties) =>
-    {
-      "bottom": statusToString(bottom),
-      "left": statusToString(left),
-      "right": statusToString(right),
-      "top": statusToString(top),
-    }
-
-  let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacingArea) =>
-    {
-      "margin": encodeSpacingProperties(margin),
-      "padding": encodeSpacingProperties(padding),
-    }
 
   let update = (state, action) => {
     switch action {
@@ -213,7 +212,6 @@ let make = () => {
         spacingArea: spacingArea,
         initialState: spacingArea,
       }
-    | NoOp => initialState
     | UpdatedSpacing(newSpacing) =>
       switch newSpacing {
       | Margin(m) => {
@@ -227,9 +225,7 @@ let make = () => {
           {...state, spacingArea: newSpacing}
         }
       }
-    | Saved => // let _ = Js.Console.log(("saved", body))
-
-      {...state, shouldFetch: true}
+    | Saved => {...state, shouldFetch: true}
     | StartedFetching => {...state, shouldFetch: false}
     }
   }
