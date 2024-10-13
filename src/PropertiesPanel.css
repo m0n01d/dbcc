@@ -31,12 +31,12 @@ button.publish {
 }
 
 .box {
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
   background-color: #28334d;
 }
 
-.viewPadding {
-  border: 2px solid #3d4b6c;
+.viewPrism .viewPrism {
+  border: 4px solid #3d4b6c;
 }
 
 .text-sm {
@@ -74,6 +74,10 @@ button.publish {
   padding-right: 1rem;
 }
 
+.py-1 {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
 .w-full {
   width: 100%;
 }

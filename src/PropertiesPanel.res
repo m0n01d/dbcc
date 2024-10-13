@@ -143,7 +143,7 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
   )
 
   <div>
-    <div className={"inline-block px-1 text-sm"}>
+    <div className={"inline-block px-1 py-1 text-sm"}>
       {switch theStatus {
       | Changed(str) =>
         <button
@@ -238,6 +238,7 @@ let make = () => {
       |> Js.Promise.then_(res => {
         let result = res->Json.decode(Json.Decode.array(Decode.decodeSpacing))
         switch result {
+        | Ok([]) => dispatch(GotSpacing(initialState.spacingArea))
         | Ok([spacingArea]) => dispatch(GotSpacing(spacingArea))
         | Error(err) => Js.Console.log("@TODO error handling :)")
         }
@@ -249,7 +250,7 @@ let make = () => {
     None
   }, [state.shouldFetch])
   let rec viewPrism = (outerSpacing: spacing, maybeInnerSpacing: option<spacing>) => {
-    <div className={"viewPadding w-full"}>
+    <div className={"viewPrism w-full"}>
       <div className={"flex-1 flex justify-center"}>
         {viewSpacingProperty(outerSpacing, Top, dispatch)}
       </div>
@@ -284,8 +285,8 @@ let make = () => {
 
   let isChanged = property_ => {
     switch property_ {
-    | Changed(_) => true
-    | _ => false
+    | Default(_) => false
+    | _ => true
     }
   }
   let anyFieldChanged = properties =>
@@ -307,17 +308,17 @@ let make = () => {
       isSpacingChanged(state.spacingArea.padding),
     ] |> Js.Array.some(identity)
 
-  let _ = Js.Console.log(("disabled", !isChanged))
   <aside className="PropertiesPanel">
     // <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
       <form
-        className={"box"}
         onSubmit={e => {
           ReactEvent.Form.preventDefault(e)
           saveSpacing(state.spacingArea)->ignore
         }}>
-        {viewPrism(state.spacingArea.margin, Some(state.spacingArea.padding))}
+        <div className={"box"}>
+          {viewPrism(state.spacingArea.margin, Some(state.spacingArea.padding))}
+        </div>
         <div className={"px-4"}>
           <button className={"publish"} disabled={!isChanged} type_={"submit"}>
             {"Publish"->React.string}
