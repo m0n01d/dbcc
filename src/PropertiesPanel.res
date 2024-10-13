@@ -70,9 +70,10 @@ type spacing = Margin(properties) | Padding(properties)
 
 type spacingArea = {margin: spacing, padding: spacing}
 
-type model = {initialState: spacingArea, shouldFetch: bool, spacingArea: spacingArea}
-
 type field = Top | Bottom | Left | Right
+
+type model = {shouldFetch: bool, spacingArea: spacingArea}
+
 type msg = GotSpacing(spacingArea) | UpdatedSpacing(spacing) | Saved | StartedFetching
 
 let encodeSpacingProperties = ({bottom, left, right, top}: properties) =>
@@ -91,12 +92,12 @@ let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacin
 
 module Decode = {
   open Json.Decode
-  let decodeStuff = Json.Decode.map(string, (. s) => Default(s))
+  let decodeStatus = Json.Decode.map(string, (. s) => Default(s))
   let decodeProperties = object(field => {
-    bottom: field.required(. "bottom", decodeStuff),
-    left: field.required(. "left", decodeStuff),
-    right: field.required(. "right", decodeStuff),
-    top: field.required(. "top", decodeStuff),
+    bottom: field.required(. "bottom", decodeStatus),
+    left: field.required(. "left", decodeStatus),
+    right: field.required(. "right", decodeStatus),
+    top: field.required(. "top", decodeStatus),
   })
   let decodeSpacing = object(field => {
     margin: field.required(.
@@ -141,53 +142,53 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
     updateFieldSpacing(marginOrPadding, theField, newValue),
   )
 
-  <span className={"text-sm "}>
-    {switch theStatus {
-    | Changed(str) =>
-      <button
-        className={"changed unset"}
-        type_={"button"}
-        onClick={_ => dispatch(updateSpacing(Focused(str)))}>
-        {str->React.string}
-      </button>
-    | Default(str) => {
-        let focusProperty = _ => {
-          dispatch(updateSpacing(Focused(str)))
-        }
-        <button className={"default unset"} type_={"button"} onClick={focusProperty}>
+  <div>
+    <div className={"inline-block px-1 text-sm"}>
+      {switch theStatus {
+      | Changed(str) =>
+        <button
+          className={"changed unset"}
+          type_={"button"}
+          onClick={_ => dispatch(updateSpacing(Focused(str)))}>
           {str->React.string}
         </button>
-      }
-    | Focused(str) => {
-        let handleInput = e => {
-          dispatch(updateSpacing(Focused(ReactEvent.Form.currentTarget(e)["value"])))
+      | Default(str) => {
+          let focusProperty = _ => {
+            dispatch(updateSpacing(Focused(str)))
+          }
+          <button className={"default unset"} type_={"button"} onClick={focusProperty}>
+            {str->React.string}
+          </button>
         }
-        let handleBlur = e => {
-          dispatch(updateSpacing(Changed(str)))
+      | Focused(str) => {
+          let handleInput = e => {
+            dispatch(updateSpacing(Focused(ReactEvent.Form.currentTarget(e)["value"])))
+          }
+          let handleBlur = e => {
+            if str == "" {
+              dispatch(updateSpacing(Changed("auto")))
+            } else {
+              dispatch(updateSpacing(Changed(str)))
+            }
+          }
+          <input
+            autoFocus={true}
+            className={"px-1"}
+            onBlur={handleBlur}
+            onChange={handleInput}
+            required={true}
+            size={str->Js.String.length->Js.Math.max_int(1)}
+            value={str}
+          />
         }
-        <input autoFocus={true} value={str} onChange={handleInput} onBlur={handleBlur} size={5} />
-      }
-    }}
-  </span>
+      }}
+    </div>
+  </div>
 }
 
 @genType @genType.as("PropertiesPanel") @react.component
 let make = () => {
   let initialState = {
-    initialState: {
-      margin: Margin({
-        bottom: Default("auto"),
-        left: Default("auto"),
-        right: Default("auto"),
-        top: Default("auto"),
-      }),
-      padding: Padding({
-        bottom: Default("auto"),
-        left: Default("auto"),
-        right: Default("auto"),
-        top: Default("auto"),
-      }),
-    },
     shouldFetch: true,
     spacingArea: {
       margin: Margin({
@@ -210,19 +211,18 @@ let make = () => {
     | GotSpacing(spacingArea) => {
         ...state,
         spacingArea: spacingArea,
-        initialState: spacingArea,
       }
     | UpdatedSpacing(newSpacing) =>
       switch newSpacing {
       | Margin(m) => {
           let spacingArea = state.spacingArea
-          let newSpacing = {...spacingArea, margin: Margin(m)}
-          {...state, spacingArea: newSpacing}
+          let newSpacingArea = {...spacingArea, margin: newSpacing}
+          {...state, spacingArea: newSpacingArea}
         }
       | Padding(p) => {
           let spacingArea = state.spacingArea
-          let newSpacing = {...spacingArea, padding: Padding(p)}
-          {...state, spacingArea: newSpacing}
+          let newSpacingArea = {...spacingArea, padding: newSpacing}
+          {...state, spacingArea: newSpacingArea}
         }
       }
     | Saved => {...state, shouldFetch: true}
@@ -232,7 +232,6 @@ let make = () => {
 
   let (state, dispatch) = React.useReducer(update, initialState)
   React.useEffect1(() => {
-    // Fetch the data from /examples and set the state when the promise resolves
     dispatch(StartedFetching)
     if state.shouldFetch {
       Fetch.fetchJson(apiUrl)
@@ -243,8 +242,6 @@ let make = () => {
         | Error(err) => Js.Console.log("@TODO error handling :)")
         }
         Js.Promise.resolve()
-        // let spacingArea = {margin: Margin(spacing.margin), padding: Padding(spacing.padding)}
-        // NOTE: this uses an unsafe type cast, as safely parsing JSON in rescript is somewhat advanced.
       })
       // The "ignore" function is necessary because each statement is expected to return `unit` type, but Js.Promise.then return a Promise type.
       |> ignore
@@ -257,7 +254,7 @@ let make = () => {
         {viewSpacingProperty(outerSpacing, Top, dispatch)}
       </div>
       <div className={"flex"}>
-        <div className={"w-1/6 flex justify-center items-center"}>
+        <div className={"w-1/6 px-1 flex justify-center items-center"}>
           {viewSpacingProperty(outerSpacing, Left, dispatch)}
         </div>
         <div className={"flex-2 flex justify-center"}>
@@ -266,7 +263,7 @@ let make = () => {
           | _ => React.null
           }}
         </div>
-        <div className={"w-1/6 flex justify-center items-center"}>
+        <div className={"w-1/6 px-1 flex justify-center items-center"}>
           {viewSpacingProperty(outerSpacing, Right, dispatch)}
         </div>
       </div>
@@ -277,7 +274,6 @@ let make = () => {
   }
 
   let saveSpacing = spacingArea => {
-    //dispatch(Saving...)
     let body: 'a = encodeSpacing(spacingArea)
     Fetch.postJson(apiUrl, ~body) |> Js.Promise.then_(res => {
       dispatch(Saved)
@@ -287,7 +283,7 @@ let make = () => {
   }
 
   <aside className="PropertiesPanel">
-    <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
+    // <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
       <form
         className={"box"}

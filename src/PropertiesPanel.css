@@ -48,11 +48,27 @@ button.default {
   align-items: center;
 }
 
+.inline-block {
+  display: inline-block;
+}
+
+.px-1 {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
 .w-full {
   width: 100%;
 }
 .w-1\/6 {
   width: 16.666667%;
+}
+
+input {
+  background: #3d4b6c;
+  color: white;
+  display: inline-block;
+  margin: 0.2rem 0;
 }
 
 .Collapsible {
