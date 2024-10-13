@@ -282,6 +282,32 @@ let make = () => {
     })
   }
 
+  let isChanged = property_ => {
+    switch property_ {
+    | Changed(_) => true
+    | _ => false
+    }
+  }
+  let anyFieldChanged = properties =>
+    [properties.bottom, properties.left, properties.right, properties.top] |> Js.Array.some(
+      isChanged,
+    )
+
+  let isSpacingChanged = spacingArea =>
+    switch spacingArea {
+    | Margin(margin) => anyFieldChanged(margin)
+    | Padding(padding) => anyFieldChanged(padding)
+    }
+
+  let identity = x => x
+
+  let isChanged =
+    [
+      isSpacingChanged(state.spacingArea.margin),
+      isSpacingChanged(state.spacingArea.padding),
+    ] |> Js.Array.some(identity)
+
+  let _ = Js.Console.log(("disabled", !isChanged))
   <aside className="PropertiesPanel">
     // <Collapsible title="Load examples"> <ViewExamples /> </Collapsible>
     <Collapsible title="Margins & Padding">
@@ -292,7 +318,11 @@ let make = () => {
           saveSpacing(state.spacingArea)->ignore
         }}>
         {viewPrism(state.spacingArea.margin, Some(state.spacingArea.padding))}
-        <button type_={"submit"}> {"save"->React.string} </button>
+        <div className={"px-4"}>
+          <button className={"publish"} disabled={!isChanged} type_={"submit"}>
+            {"Publish"->React.string}
+          </button>
+        </div>
       </form>
     </Collapsible>
     <Collapsible title="Size"> <span> {React.string("example")} </span> </Collapsible>
