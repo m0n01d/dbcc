@@ -35,6 +35,12 @@ button.publish {
   background-color: #28334d;
 }
 
+.viewPrism textarea {
+  resize: none;
+  height: 12px;
+  width: auto;
+}
+
 .viewPrism .viewPrism {
   border: 4px solid #3d4b6c;
 }

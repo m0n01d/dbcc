@@ -53,14 +53,22 @@ module ViewExamples = {
   }
 }
 
-type theUnit = string // "%" "px"
+type theUnit = Pixels | Points // "%" "px"
+let theUnitToString = theUnit =>
+  switch theUnit {
+  | Pixels => "px"
+  | Points => "pt"
+  }
+type userInput = (string, theUnit)
+// @TODO add combo box for unit input
 
-type status = Changed(theUnit) | Default(theUnit) | Focused(theUnit)
+type status = Changed(userInput) | Default | Focused(userInput) | Saved(userInput)
 let statusToString = (status: status): string => {
   switch status {
-  | Changed(str) => str
-  | Default(str) => str
-  | Focused(str) => str
+  | Changed((val, suffix)) => val
+  | Default => "auto"
+  | Focused((val, suffix)) => val
+  | Saved((val, suffix)) => val
   }
 }
 
@@ -70,12 +78,13 @@ type spacing = Margin(properties) | Padding(properties)
 
 type spacingArea = {margin: spacing, padding: spacing}
 
-type field = Top | Bottom | Left | Right
+type side = Top | Bottom | Left | Right
 
 type model = {shouldFetch: bool, spacingArea: spacingArea}
 
-type msg = GotSpacing(spacingArea) | UpdatedSpacing(spacing) | Saved | StartedFetching
+type msg = ClickedSaved | GotSpacing(spacingArea) | UpdatedSpacing(spacing) | StartedFetching
 
+// @TODO fix encoding................asdfasdfafw
 let encodeSpacingProperties = ({bottom, left, right, top}: properties) =>
   {
     "bottom": statusToString(bottom),
@@ -92,7 +101,8 @@ let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacin
 
 module Decode = {
   open Json.Decode
-  let decodeStatus = Json.Decode.map(string, (. s) => Default(s))
+  // @TODO fix decoder
+  let decodeStatus = Json.Decode.map(string, (. s) => Saved((s, Pixels)))
   let decodeProperties = object(field => {
     bottom: field.required(. "bottom", decodeStatus),
     left: field.required(. "left", decodeStatus),
@@ -141,45 +151,77 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
   let updateSpacing = newValue => UpdatedSpacing(
     updateFieldSpacing(marginOrPadding, theField, newValue),
   )
+  let handleFocus = e => {
+    let t = ReactEvent.Mouse.currentTarget(e)["textContent"]
+    Js.Console.log(("focused", e, t))
+    dispatch(updateSpacing(Focused(t)))
+  }
 
   <div>
     <div className={"inline-block px-1 py-1 text-sm"}>
       {switch theStatus {
-      | Changed(str) =>
+      | Changed((val, suffix)) =>
         <button
           className={"changed unset"}
           type_={"button"}
-          onClick={_ => dispatch(updateSpacing(Focused(str)))}>
-          {str->React.string}
+          onClick={_ => dispatch(updateSpacing(Focused((val, suffix))))}>
+          {`${val}${suffix->theUnitToString}`->React.string}
         </button>
-      | Default(str) => {
+
+      | Default => {
           let focusProperty = _ => {
-            dispatch(updateSpacing(Focused(str)))
+            dispatch(updateSpacing(Focused(("0", Pixels))))
           }
           <button className={"default unset"} type_={"button"} onClick={focusProperty}>
-            {str->React.string}
+            {"auto"->React.string}
           </button>
         }
-      | Focused(str) => {
-          let handleInput = e => {
-            dispatch(updateSpacing(Focused(ReactEvent.Form.currentTarget(e)["value"])))
+      | Focused((str, suffix)) =>
+        let handleInput = e => {
+          Js.Console.log(("input", e))
+          let s = ReactEvent.Form.currentTarget(e)["value"]
+          dispatch(updateSpacing(Focused((s, suffix))))
+        }
+        let handleBlur = e => {
+          let relatedTarget = ReactEvent.Focus.relatedTarget(e)
+          let relatedTarget_ = relatedTarget |> Js.Option.getWithDefault({"nodeName": "nope"})
+          let nextSibling = ReactEvent.Focus.target(e)["nextSibling"]
+          if relatedTarget == nextSibling || relatedTarget_["nodeName"] == "INPUT" {
+            ReactEvent.Focus.preventDefault(e)
+          } else if str == "" {
+            dispatch(updateSpacing(Default))
+          } else {
+            dispatch(updateSpacing(Changed((str, suffix))))
           }
-          let handleBlur = e => {
-            if str == "" {
-              dispatch(updateSpacing(Changed("auto")))
-            } else {
-              dispatch(updateSpacing(Changed(str)))
-            }
-          }
+        }
+        let handleSelect = e => {
+          Js.Console.log(("select", e))
+          let suffix = ReactEvent.Form.currentTarget(e)["value"]
+          dispatch(updateSpacing(Focused((str, suffix))))
+        }
+        <div className={"flex"} onBlur={handleBlur}>
           <input
             autoFocus={true}
-            className={"px-1"}
-            onBlur={handleBlur}
+            className={"status-input px-1"}
             onChange={handleInput}
             required={true}
             size={str->Js.String.length->Js.Math.max_int(1)}
             value={str}
           />
+          <select onChange={handleSelect}>
+            {[Pixels, Points]
+            |> Js.Array.map(u => <option> {u->theUnitToString->React.string} </option>)
+            |> React.array}
+          </select>
+        </div>
+
+      | Saved((val, suffix)) => {
+          let focusProperty = _ => {
+            dispatch(updateSpacing(Focused((val, suffix))))
+          }
+          <button className={"default unset"} type_={"button"} onClick={focusProperty}>
+            {val->React.string}
+          </button>
         }
       }}
     </div>
@@ -188,26 +230,28 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
 
 @genType @genType.as("PropertiesPanel") @react.component
 let make = () => {
+  let defaultField = Default
   let initialState = {
     shouldFetch: true,
     spacingArea: {
       margin: Margin({
-        bottom: Default("auto"),
-        left: Default("auto"),
-        right: Default("auto"),
-        top: Default("auto"),
+        bottom: defaultField,
+        left: defaultField,
+        right: defaultField,
+        top: defaultField,
       }),
       padding: Padding({
-        bottom: Default("auto"),
-        left: Default("auto"),
-        right: Default("auto"),
-        top: Default("auto"),
+        bottom: defaultField,
+        left: defaultField,
+        right: defaultField,
+        top: defaultField,
       }),
     },
   }
 
   let update = (state, action) => {
     switch action {
+    | ClickedSaved => {...state, shouldFetch: true}
     | GotSpacing(spacingArea) => {
         ...state,
         spacingArea: spacingArea,
@@ -225,7 +269,6 @@ let make = () => {
           {...state, spacingArea: newSpacingArea}
         }
       }
-    | Saved => {...state, shouldFetch: true}
     | StartedFetching => {...state, shouldFetch: false}
     }
   }
@@ -277,7 +320,7 @@ let make = () => {
   let saveSpacing = spacingArea => {
     let body: 'a = encodeSpacing(spacingArea)
     Fetch.postJson(apiUrl, ~body) |> Js.Promise.then_(res => {
-      dispatch(Saved)
+      dispatch(ClickedSaved)
 
       Js.Promise.resolve(res)
     })
