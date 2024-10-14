@@ -63,14 +63,6 @@ type userInput = (string, theUnit)
 // @TODO add combo box for unit input
 
 type status = Changed(userInput) | Default | Focused(userInput) | Saved(userInput)
-let statusToString = (status: status): string => {
-  switch status {
-  | Changed((val, suffix)) => val
-  | Default => "auto"
-  | Focused((val, suffix)) => val
-  | Saved((val, suffix)) => val
-  }
-}
 
 type properties = {bottom: status, left: status, right: status, top: status}
 
@@ -84,13 +76,21 @@ type model = {shouldFetch: bool, spacingArea: spacingArea}
 
 type msg = ClickedSaved | GotSpacing(spacingArea) | UpdatedSpacing(spacing) | StartedFetching
 
-// @TODO fix encoding................asdfasdfafw
+let encodeStatus_ = ((val, suffix)) => {"val": val, "unit": suffix->theUnitToString}
+let encodeStatus = (status: status) => {
+  switch status {
+  | Changed(inner) => encodeStatus_(inner)
+  | Default => {"val": "auto", "unit": ""}
+  | Focused(inner) => encodeStatus_(inner)
+  | Saved(inner) => encodeStatus_(inner)
+  }
+}
 let encodeSpacingProperties = ({bottom, left, right, top}: properties) =>
   {
-    "bottom": statusToString(bottom),
-    "left": statusToString(left),
-    "right": statusToString(right),
-    "top": statusToString(top),
+    "bottom": encodeStatus(bottom),
+    "left": encodeStatus(left),
+    "right": encodeStatus(right),
+    "top": encodeStatus(top),
   }
 
 let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacingArea) =>
@@ -99,10 +99,40 @@ let encodeSpacing = ({margin: Margin(margin), padding: Padding(padding)}: spacin
     "padding": encodeSpacingProperties(padding),
   }
 
+let decodeSuffix = suffix => {
+  switch suffix {
+  | "px" => Pixels
+  | "pt" => Points
+  }
+}
+
 module Decode = {
   open Json.Decode
-  // @TODO fix decoder
-  let decodeStatus = Json.Decode.map(string, (. s) => Saved((s, Pixels)))
+
+  type decodeHelp = {
+    val: string,
+    unit: theUnit,
+  }
+  type defaultHelp = {val: string}
+
+  let decodeStatus_ = field("val", Json.Decode.string)
+  let decodeSuffix_ = Json.Decode.map(string, (. s) => decodeSuffix(s))
+  let decodeSaved = Json.Decode.object(field => {
+    val: field.required(. "val", Json.Decode.string),
+    unit: field.required(. "unit", decodeSuffix_),
+  })->Json.Decode.map((. x) => Saved((x.val, x.unit)))
+
+  let decodeDefault = Json.Decode.object(field => {
+    val: field.required(. "val", Json.Decode.string),
+  })->Json.Decode.flatMap((. s) =>
+    if s.val == "auto" {
+      Json.Decode.custom((. _) => Default)
+    } else {
+      Error.expected("ignored", Js.Json.string("fall through"))
+    }
+  )
+  let decodeStatus = Json.Decode.oneOf([decodeDefault, decodeSaved])
+
   let decodeProperties = object(field => {
     bottom: field.required(. "bottom", decodeStatus),
     left: field.required(. "left", decodeStatus),
@@ -151,11 +181,6 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
   let updateSpacing = newValue => UpdatedSpacing(
     updateFieldSpacing(marginOrPadding, theField, newValue),
   )
-  let handleFocus = e => {
-    let t = ReactEvent.Mouse.currentTarget(e)["textContent"]
-    Js.Console.log(("focused", e, t))
-    dispatch(updateSpacing(Focused(t)))
-  }
 
   <div>
     <div className={"inline-block px-1 py-1 text-sm"}>
@@ -178,7 +203,6 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
         }
       | Focused((str, suffix)) =>
         let handleInput = e => {
-          Js.Console.log(("input", e))
           let s = ReactEvent.Form.currentTarget(e)["value"]
           dispatch(updateSpacing(Focused((s, suffix))))
         }
@@ -194,9 +218,9 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
             dispatch(updateSpacing(Changed((str, suffix))))
           }
         }
+
         let handleSelect = e => {
-          Js.Console.log(("select", e))
-          let suffix = ReactEvent.Form.currentTarget(e)["value"]
+          let suffix = ReactEvent.Form.currentTarget(e)["value"]->decodeSuffix
           dispatch(updateSpacing(Focused((str, suffix))))
         }
         <div className={"flex"} onBlur={handleBlur}>
@@ -208,9 +232,13 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
             size={str->Js.String.length->Js.Math.max_int(1)}
             value={str}
           />
-          <select onChange={handleSelect}>
+          <select onChange={handleSelect} value={suffix->theUnitToString}>
             {[Pixels, Points]
-            |> Js.Array.map(u => <option> {u->theUnitToString->React.string} </option>)
+            |> Js.Array.map(u =>
+              <option value={u->theUnitToString} key={u->theUnitToString}>
+                {u->theUnitToString->React.string}
+              </option>
+            )
             |> React.array}
           </select>
         </div>
@@ -220,7 +248,7 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
             dispatch(updateSpacing(Focused((val, suffix))))
           }
           <button className={"default unset"} type_={"button"} onClick={focusProperty}>
-            {val->React.string}
+            {`${val}${suffix->theUnitToString}`->React.string}
           </button>
         }
       }}
@@ -280,10 +308,11 @@ let make = () => {
       Fetch.fetchJson(apiUrl)
       |> Js.Promise.then_(res => {
         let result = res->Json.decode(Json.Decode.array(Decode.decodeSpacing))
+
         switch result {
         | Ok([]) => dispatch(GotSpacing(initialState.spacingArea))
         | Ok([spacingArea]) => dispatch(GotSpacing(spacingArea))
-        | Error(err) => Js.Console.log("@TODO error handling :)")
+        | Error(err) => Js.Console.log(("@TODO error handling :)", err))
         }
         Js.Promise.resolve()
       })
@@ -319,6 +348,7 @@ let make = () => {
 
   let saveSpacing = spacingArea => {
     let body: 'a = encodeSpacing(spacingArea)
+
     Fetch.postJson(apiUrl, ~body) |> Js.Promise.then_(res => {
       dispatch(ClickedSaved)
 
@@ -329,6 +359,8 @@ let make = () => {
   let isChanged = property_ => {
     switch property_ {
     | Default(_) => false
+    | Saved(_) => false
+
     | _ => true
     }
   }
