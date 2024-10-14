@@ -59,8 +59,7 @@ let theUnitToString = theUnit =>
   | Pixels => "px"
   | Points => "pt"
   }
-type userInput = (string, theUnit)
-// @TODO add combo box for unit input
+type userInput = (int, theUnit)
 
 type status = Changed(userInput) | Default | Focused(userInput) | Saved(userInput)
 
@@ -80,7 +79,7 @@ let encodeStatus_ = ((val, suffix)) => {"val": val, "unit": suffix->theUnitToStr
 let encodeStatus = (status: status) => {
   switch status {
   | Changed(inner) => encodeStatus_(inner)
-  | Default => {"val": "auto", "unit": ""}
+  | Default => {"val": 0, "unit": ""}
   | Focused(inner) => encodeStatus_(inner)
   | Saved(inner) => encodeStatus_(inner)
   }
@@ -110,22 +109,22 @@ module Decode = {
   open Json.Decode
 
   type decodeHelp = {
-    val: string,
+    val: int,
     unit: theUnit,
   }
-  type defaultHelp = {val: string}
+  type defaultHelp = {val: int}
 
-  let decodeStatus_ = field("val", Json.Decode.string)
+  let decodeStatus_ = field("val", Json.Decode.int)
   let decodeSuffix_ = Json.Decode.map(string, (. s) => decodeSuffix(s))
   let decodeSaved = Json.Decode.object(field => {
-    val: field.required(. "val", Json.Decode.string),
+    val: field.required(. "val", Json.Decode.int),
     unit: field.required(. "unit", decodeSuffix_),
   })->Json.Decode.map((. x) => Saved((x.val, x.unit)))
 
   let decodeDefault = Json.Decode.object(field => {
-    val: field.required(. "val", Json.Decode.string),
+    val: field.required(. "val", Json.Decode.int),
   })->Json.Decode.flatMap((. s) =>
-    if s.val == "auto" {
+    if s.val == 0 {
       Json.Decode.custom((. _) => Default)
     } else {
       Error.expected("ignored", Js.Json.string("fall through"))
@@ -190,12 +189,12 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
           className={"changed unset"}
           type_={"button"}
           onClick={_ => dispatch(updateSpacing(Focused((val, suffix))))}>
-          {`${val}${suffix->theUnitToString}`->React.string}
+          {`${val->Belt.Int.toString}${suffix->theUnitToString}`->React.string}
         </button>
 
       | Default => {
           let focusProperty = _ => {
-            dispatch(updateSpacing(Focused(("0", Pixels))))
+            dispatch(updateSpacing(Focused((0, Pixels))))
           }
           <button className={"default unset"} type_={"button"} onClick={focusProperty}>
             {"auto"->React.string}
@@ -204,7 +203,13 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
       | Focused((str, suffix)) =>
         let handleInput = e => {
           let s = ReactEvent.Form.currentTarget(e)["value"]
-          dispatch(updateSpacing(Focused((s, suffix))))
+
+          let maybeNum = s->Belt.Int.fromString
+          // @TODO fix negative numbers
+          switch maybeNum {
+          | Some(n) => dispatch(updateSpacing(Focused((n, suffix))))
+          | _ => dispatch(updateSpacing(Focused((0, suffix))))
+          }
         }
         let handleBlur = e => {
           let relatedTarget = ReactEvent.Focus.relatedTarget(e)
@@ -212,7 +217,7 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
           let nextSibling = ReactEvent.Focus.target(e)["nextSibling"]
           if relatedTarget == nextSibling || relatedTarget_["nodeName"] == "INPUT" {
             ReactEvent.Focus.preventDefault(e)
-          } else if str == "" {
+          } else if str == 0 {
             dispatch(updateSpacing(Default))
           } else {
             dispatch(updateSpacing(Changed((str, suffix))))
@@ -229,8 +234,9 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
             className={"status-input px-1"}
             onChange={handleInput}
             required={true}
-            size={str->Js.String.length->Js.Math.max_int(1)}
-            value={str}
+            size={str->Js.Int.toString->Js.String.length->Js.Math.max_int(1)}
+            // type_={"number"} // harder to style
+            value={str->Js.Int.toString}
           />
           <select onChange={handleSelect} value={suffix->theUnitToString}>
             {[Pixels, Points]
@@ -248,7 +254,7 @@ let viewSpacingProperty = (marginOrPadding, theField, dispatch) => {
             dispatch(updateSpacing(Focused((val, suffix))))
           }
           <button className={"default unset"} type_={"button"} onClick={focusProperty}>
-            {`${val}${suffix->theUnitToString}`->React.string}
+            {`${val->Js.Int.toString}${suffix->theUnitToString}`->React.string}
           </button>
         }
       }}
